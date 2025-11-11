@@ -34,7 +34,7 @@ app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 const userRouter = require('./routes/user-auth.routes');
 const loanRouter = require('./routes/loans.routes');
 const paystackRouter = require('./routes/paystack.routes');
-const projectRouter = require('./routes/projects.routes');
+const projectRouter = require('./routes/projects.routes'); // ensure filename matches exactly
 const adminRouter = require('./routes/admin.routes');
 
 console.log('userRouter type:', typeof userRouter);
