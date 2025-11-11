@@ -1,0 +1,1 @@
+mongodb://atlas-sql-6905962c44d8e15fcd5124bf-hddurg.a.query.mongodb.net/sample_mflix?ssl=true&authSource=admin
