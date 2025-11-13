@@ -31,6 +31,15 @@ mongoose.connect(mongoUri)
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
+// Add this root route BEFORE other routes
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'FEGO Cooperative API',
+    status: 'running',
+    version: '1.0.0'
+  });
+});
+
 const userRouter = require('./routes/user-auth.routes');
 const loanRouter = require('./routes/loans.routes');
 const paystackRouter = require('./routes/paystack.routes');
@@ -49,4 +58,6 @@ app.use('/api/paystack', paystackRouter);
 app.use('/api/projects', projectRouter);
 app.use('/api/admin', adminRouter);
 
-app.get('/health', (req, res) => res.json({ ok: true }));
+app.get('/health', (req, res) => {
+  res.json({ ok: true, timestamp: new Date().toISOString() });
+});
