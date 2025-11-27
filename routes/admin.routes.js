@@ -1,74 +1,62 @@
-// fego-coop-backend/routes/admin.routes.js
-const router = require('express').Router();
-const Loan = require('../models/loans.model');
-const User = require('../models/user.model');
-const auth = require('../middleware/auth.middleware');
-const { createNotification } = require('../utilities/notification.utility');
+import express from 'express';
+import auth from '../middleware/auth.js';
+import admin from '../middleware/admin.js';
+import User from '../models/models.js';
 
-// Admin guard
-const adminOnly = (req, res, next) => {
-  if (!req.user || !req.user.isAdmin) return res.status(403).json({ msg: 'Admin only' });
-  next();
-};
+const router = express.Router();
 
-// List loans (Admin)
-router.get('/loans', auth, adminOnly, async (req, res) => {
+// GET pending (unverified) users
+router.get('/users/pending', auth, admin, async (_req, res) => {
+  const pending = await User.find({ isSynced: false })
+    .select('fullName membershipId email createdAt');
+  res.json(pending);
+});
+
+// PATCH verify a user
+router.patch('/users/:id/verify', auth, admin, async (req, res) => {
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    { $set: { isSynced: true } },
+    { new: true }
+  ).select('fullName membershipId isSynced');
+  if (!user) return res.status(404).json({ error: 'Not found' });
+  res.json(user);
+});
+
+// PATCH admin self-verify
+router.patch('/self-verify', auth, admin, async (req, res) => {
   try {
-    const loans = await Loan.find().sort({ createdAt: -1 });
-    res.json(loans);
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: { isSynced: true } },
+      { new: true }
+    ).select('fullName membershipId isSynced');
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    res.json(user);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Failed to fetch loans' });
+    console.error('Self verify error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Approve loan
-router.patch('/loans/:id/approve', auth, adminOnly, async (req, res) => {
+// POST bulk approve users
+router.post('/users/bulk-verify', auth, admin, async (req, res) => {
   try {
-    const loan = await Loan.findById(req.params.id);
-    if (!loan) return res.status(404).json({ msg: 'Loan not found' });
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'Provide array of user IDs' });
+    }
 
-    loan.status = 'Approved';
-    loan.approvedDate = new Date();
-    await loan.save();
-
-    await User.findByIdAndUpdate(loan.userId, { $inc: { currentLoanBalance: loan.amountRequested } });
-
-    await createNotification(
-      loan.userId,
-      `Your loan application for NGN ${loan.amountRequested} was Approved.`,
-      'Loan Status',
-      '/dashboard'
+    const result = await User.updateMany(
+      { _id: { $in: userIds }, isSynced: false },
+      { $set: { isSynced: true } }
     );
 
-    res.json({ msg: 'Loan approved', loan });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ msg: 'Failed to approve loan' });
+    res.json({ message: 'Bulk verification complete', modifiedCount: result.modifiedCount });
+  } catch (err) {
+    console.error('Bulk verify error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Reject loan
-router.patch('/loans/:id/reject', auth, adminOnly, async (req, res) => {
-  try {
-    const loan = await Loan.findById(req.params.id);
-    if (!loan) return res.status(404).json({ msg: 'Loan not found' });
-
-    loan.status = 'Rejected';
-    await loan.save();
-
-    await createNotification(
-      loan.userId,
-      `Your loan application for NGN ${loan.amountRequested} was Rejected.`,
-      'Loan Status',
-      '/dashboard'
-    );
-
-    res.json({ msg: 'Loan rejected', loan });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ msg: 'Failed to reject loan' });
-  }
-});
-
-module.exports = router;
+export default router;

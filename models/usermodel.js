@@ -1,48 +1,23 @@
-// fego-coop-backend/models/user.model.js
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true },
+  membershipNumber: { type: String, unique: true },
+  totalSavings: { type: Number, default: 0 },
+  role: { type: String, enum: ['member', 'admin'], default: 'member' }
+}, { timestamps: true });
 
-const userSchema = new Schema({
-    // Core Identification and Authentication
-    username: {
-        type: String,
-        required: true,
-        unique: true, // Ensures no two members have the same username/ID
-        trim: true,
-        minlength: 3
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-    },
-    password: { // We will store a HASHED password here, never plain text
-        type: String,
-        required: true,
-        minlength: 6
-    },
-    // Cooperative Specific Fields (Metadata)
-    fullName: { type: String, required: true },
-    membershipId: { type: String, required: true, unique: true },
-    
-    // Financial Tracking Fields (These will likely link to separate collections later, but we start here)
-    totalContributions: { type: Number, default: 0 },
-    currentLoanBalance: { type: Number, default: 0 },
-    investmentsInProjects: [{ 
-        projectId: { type: String },
-        amount: { type: Number },
-        date: { type: Date, default: Date.now }
-    }],
-
-    // System fields
-    isAdmin: { type: Boolean, default: false },
-
-}, {
-    timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
 });
 
-const User = mongoose.model('User', userSchema);
+userSchema.methods.comparePassword = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
 
-module.exports = User;
+export default mongoose.model('User', userSchema);
